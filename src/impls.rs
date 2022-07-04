@@ -73,7 +73,7 @@ impl Encoder for Sata {
     /// Change the default encoding method
     fn set_encoding(&mut self, encoding: IpldCodec) -> Result<&mut Sata, SataError> {
         if self.state.eq(&State::UnInitalized) {
-            return Err(SataError::EncodingSetOutOfOrder());
+            return Err(SataError::EncodingSetOutOfOrder);
         }
         self.encoding = encoding;
         Ok(self)
@@ -82,7 +82,7 @@ impl Encoder for Sata {
     /// Encode the data in place, this will write over the data field.
     fn encode(&mut self) -> Result<&mut Sata, SataError> {
         if !self.state.eq(&State::Decoded) {
-            return Err(SataError::NotDecoded());
+            return Err(SataError::NotDecoded);
         }
         let encoder: IpldCodec = self.encoding;
         self.data = self.encoded()?;
@@ -94,10 +94,10 @@ impl Encoder for Sata {
     fn encoded(self) -> Result<Vec<u8>, SataError> {
         let encoder: IpldCodec = self.encoding;
         match self.state {
-            State::UnInitalized => Err(SataError::UnInitalized()),
+            State::UnInitalized => Err(SataError::UnInitalized),
             State::Encoded => Ok(self.data),
             State::Decoded => Ok(encoder.encode(&Ipld::Bytes(self.data.clone())).unwrap()),
-            State::Encrypted =>  Err(SataError::CannotEncodeEncrypted()),
+            State::Encrypted =>  Err(SataError::CannotEncodeEncrypted),
         }
     }
 
@@ -115,7 +115,7 @@ impl Encoder for Sata {
         let encoder: IpldCodec = self.encoding;
 
         match self.state {
-            State::UnInitalized => Err(SataError::UnInitalized()),
+            State::UnInitalized => Err(SataError::UnInitalized),
             State::Encoded => {
                 let decoded = match encoder.decode(&self.data) {
                     Ok(Ipld::Bytes(data)) => data,
@@ -123,7 +123,7 @@ impl Encoder for Sata {
                 };
             },
             State::Decoded => Ok(self.data),
-            State::Encrypted => Err(SataError::CannotDecodeEncrypted())
+            State::Encrypted => Err(SataError::CannotDecodeEncrypted)
         }
     }
 }
@@ -131,8 +131,8 @@ impl Encoder for Sata {
 
 fn encryption_ready_check(sata: &mut Sata) -> Result<&mut Sata, SataError> {
     match sata.state {
-        State::UnInitalized => Err(SataError::UnInitalized()),
-        State::Encrypted => Err(SataError::AlreadyEncrypted()),
+        State::UnInitalized => Err(SataError::UnInitalized),
+        State::Encrypted => Err(SataError::AlreadyEncrypted),
         State::Encoded => Ok(sata),
         State::Decoded => Ok(sata),
     }
