@@ -331,7 +331,7 @@ impl Sata {
         };
 
         let codec = IpldCodec::try_from(self.id.codec())?;
-        let hash = Code::Sha2_256.digest(&&self.data);
+        let hash = Code::Sha2_256.digest(&self.data);
         
         if hash.ne(self.id.hash()) {
             anyhow::bail!("Hash is invalid")
