@@ -14,7 +14,7 @@ use libipld::{
     Cid, IpldCodec, multihash::{Code, MultihashDigest},
 };
 
-use serde::{Deserialize, Serialize};
+use serde::{Deserialize, Serialize, de::DeserializeOwned};
 
 use crate::error::Error;
 
@@ -177,12 +177,12 @@ impl Sata {
 }
 
 impl Sata {
-    pub fn encrypt(
+    pub fn encrypt<S: Serialize>(
         mut self,
         codec: IpldCodec,
         keypair: &DIDKey,
         kind: Kind,
-        data: Vec<u8>,
+        data: S,
     ) -> anyhow::Result<Self> {
 
         
@@ -193,8 +193,6 @@ impl Sata {
         if keypair.private_key_bytes().is_empty() {
             anyhow::bail!("DIDKey requires secret key");
         }
-
-        
 
         let ipld = to_ipld(data)?;
         let bytes = codec.encode(&ipld)?;
@@ -238,7 +236,7 @@ impl Sata {
         Ok(self)
     }
 
-    pub fn decrypt(&self, keypair: &DIDKey) -> anyhow::Result<Vec<u8>> {
+    pub fn decrypt<D: DeserializeOwned>(&self, keypair: &DIDKey) -> anyhow::Result<D> {
         if self.data.is_empty() || self.data.len() <= 4 {
             anyhow::bail!("Invalid data provided");
         }
@@ -291,14 +289,14 @@ impl Sata {
             anyhow::bail!("Hash is invalid")
         }
         
-        let data: Vec<u8> = from_ipld(codec.decode(&data)?)?;
+        let data = from_ipld(codec.decode(&data)?)?;
 
         Ok(data)
     }
 }
 
 impl Sata {
-    pub fn encode(mut self, codec: IpldCodec, kind: Kind, data: Vec<u8>) -> anyhow::Result<Self> {
+    pub fn encode<S: Serialize>(mut self, codec: IpldCodec, kind: Kind, data: S) -> anyhow::Result<Self> {
         if kind == Kind::Uninitialized {
             anyhow::bail!("Kind cannot uninitialized");
         }
@@ -321,7 +319,7 @@ impl Sata {
         Ok(self)
     }
 
-    pub fn decode(&self) -> anyhow::Result<Vec<u8>> {
+    pub fn decode<D: DeserializeOwned>(&self) -> anyhow::Result<D> {
         if self.data.is_empty() {
             anyhow::bail!(Error::Unknown);
         }
@@ -338,7 +336,7 @@ impl Sata {
         if hash.ne(self.id.hash()) {
             anyhow::bail!("Hash is invalid")
         }
-        let data: Vec<u8> = from_ipld(codec.decode(&self.data)?)?;
+        let data = from_ipld(codec.decode(&self.data)?)?;
         Ok(data)
     }
 }

@@ -21,7 +21,7 @@ mod tests {
             plaintext.to_vec(),
         )?;
     
-        let extracted_data_by_bob = encrypted_data.decrypt(&bob_did)?;
+        let extracted_data_by_bob: Vec<u8> = encrypted_data.decrypt(&bob_did)?;
     
         assert_eq!(extracted_data_by_bob, plaintext.to_vec());
         

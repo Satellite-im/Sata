@@ -13,7 +13,7 @@ mod tests {
             raw_data.to_vec(),
         )?;
 
-        let decoded_data = encoded_data.decode()?;
+        let decoded_data: Vec<u8> = encoded_data.decode()?;
         assert_eq!(decoded_data, raw_data.to_vec());
         Ok(())
     }
