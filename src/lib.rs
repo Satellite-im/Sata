@@ -94,6 +94,10 @@ impl Sata {
         self.kind
     }
 
+    pub fn state(&self) -> State {
+        self.state
+    }
+
     pub fn timestamp(&self) -> DateTime<Utc> {
         self.timestamp
     }
@@ -119,14 +123,14 @@ impl Sata {
 }
 
 impl Sata {
-    pub fn add_recipients(&mut self, recipients: Vec<DIDKey>) -> anyhow::Result<()> {
+    pub fn add_recipients(&mut self, recipients: &Vec<DIDKey>) -> Result<(), Error> {
         if self.kind() != Kind::Uninitialized {
-            anyhow::bail!("Cannot add recipient to initialized data")
+            return Err(Error::InitializedData)
         }
 
         match self.state {
             State::Uninitialized => {},
-            _ => anyhow::bail!("Cannot add to initialized data")
+            _ => return Err(Error::InitializedData)
         };
 
         self.recipients = Some(
@@ -139,18 +143,18 @@ impl Sata {
         Ok(())
     }
 
-    pub fn add_recipient(&mut self, recipient: &DIDKey) -> anyhow::Result<()> {
+    pub fn add_recipient(&mut self, recipient: &DIDKey) -> Result<(), Error> {
         if self.kind() != Kind::Uninitialized {
-            anyhow::bail!("Cannot add recipient to initialized data")
+            return Err(Error::InitializedData)
         }
         match self.state {
             State::Uninitialized => {},
-            _ => anyhow::bail!("Cannot add to initialized data")
+            _ => return Err(Error::InitializedData)
         };
         let fingerprint = format!("did:key:{}", recipient.fingerprint());
         if let Some(list) = self.recipients.as_mut() {
             if list.contains(&fingerprint) {
-                anyhow::bail!("Recipient already exist")    
+                return Err(Error::RecipientExist)
             }
             list.push(fingerprint);
         } else {
@@ -159,10 +163,10 @@ impl Sata {
         Ok(())
     }
 
-    pub fn remove_recipient(&mut self, recipient: &str) -> anyhow::Result<DIDKey> {
+    pub fn remove_recipient(&mut self, recipient: &str) -> Result<DIDKey, Error> {
         match self.state {
             State::Uninitialized => {},
-            _ => anyhow::bail!("Cannot remove from initialized data")
+            _ => return Err(Error::InitializedData)
         };
         let list = self.recipients.as_mut().ok_or(Error::Unknown)?;
         let index = list
@@ -183,18 +187,17 @@ impl Sata {
         keypair: &DIDKey,
         kind: Kind,
         data: S,
-    ) -> anyhow::Result<Self> {
+    ) -> Result<Self, Error> {
 
-        
-        if kind == Kind::Uninitialized {
-            anyhow::bail!("Kind cannot uninitialized");
+        if self.kind() != Kind::Uninitialized {
+            return Err(Error::InitializedData)
         }
 
         if keypair.private_key_bytes().is_empty() {
-            anyhow::bail!("DIDKey requires secret key");
+            return Err(Error::PrivateKeyRequired)
         }
 
-        let ipld = to_ipld(data)?;
+        let ipld = to_ipld(data).map_err(anyhow::Error::from)?;
         let bytes = codec.encode(&ipld)?;
         let hash = Code::Sha2_256.digest(&bytes);
         let version = if codec == IpldCodec::DagPb {
@@ -203,7 +206,7 @@ impl Sata {
             Version::V1
         };
 
-        let cid = Cid::new(version, codec.into(), hash)?;
+        let cid = Cid::new(version, codec.into(), hash).map_err(anyhow::Error::from)?;
 
         self.id = cid;
         self.kind = kind;
@@ -236,30 +239,30 @@ impl Sata {
         Ok(self)
     }
 
-    pub fn decrypt<D: DeserializeOwned>(&self, keypair: &DIDKey) -> anyhow::Result<D> {
-        if self.data.is_empty() || self.data.len() <= 4 {
-            anyhow::bail!("Invalid data provided");
+    pub fn decrypt<D: DeserializeOwned>(&self, keypair: &DIDKey) -> Result<D, Error> {
+        if self.data.is_empty() {
+            return Err(Error::InvalidData)
         }
 
         match self.state {
-            State::Encoded => anyhow::bail!("Data is encoded"),
+            State::Encoded => return Err(Error::AlreadyEncrypted),
             State::Encrypted => {},
-            _ => anyhow::bail!("Unknown data")
+            _ => return Err(Error::Unknown)
         };
 
         match self.recipients.as_ref() {
             Some(list) => {
                 let uri = format!("did:key:{}", keypair.fingerprint());
                 if !list.contains(&uri) {
-                    anyhow::bail!("DID Key is not a recipient")
+                    return Err(Error::RecipientDoesntExist)
                 }
             }
-            None => anyhow::bail!("Recipients DID Required"),
+            None => return Err(Error::RecipientRequired),
         };
 
         let sender_did = match self.sender.as_ref() {
             Some(did_raw) => did_key::resolve(did_raw).map_err(|e| anyhow::anyhow!("{:?}", e))?,
-            None => anyhow::bail!("Sender DID Required"),
+            None => return Err(Error::Unknown), //Invalid sender did
         };
 
         let sender_x25519 =
@@ -286,21 +289,22 @@ impl Sata {
         let hash = Code::Sha2_256.digest(&data);
         
         if hash.ne(self.id.hash()) {
-            anyhow::bail!("Hash is invalid")
+            return Err(Error::InvalidData)
         }
         
-        let data = from_ipld(codec.decode(&data)?)?;
+        let data = from_ipld(codec.decode(&data)?).map_err(anyhow::Error::from)?;
 
         Ok(data)
     }
 }
 
 impl Sata {
-    pub fn encode<S: Serialize>(mut self, codec: IpldCodec, kind: Kind, data: S) -> anyhow::Result<Self> {
-        if kind == Kind::Uninitialized {
-            anyhow::bail!("Kind cannot uninitialized");
+    pub fn encode<S: Serialize>(mut self, codec: IpldCodec, kind: Kind, data: S) -> Result<Self, Error> {
+        if self.kind() != Kind::Uninitialized {
+            return Err(Error::InitializedData)
         }
-        let ipld = to_ipld(data)?;
+
+        let ipld = to_ipld(data).map_err(anyhow::Error::from)?;
         let bytes = codec.encode(&ipld)?;
         let hash = Code::Sha2_256.digest(&bytes);
         let version = if codec == IpldCodec::DagPb {
@@ -319,24 +323,24 @@ impl Sata {
         Ok(self)
     }
 
-    pub fn decode<D: DeserializeOwned>(&self) -> anyhow::Result<D> {
+    pub fn decode<D: DeserializeOwned>(&self) -> Result<D, Error> {
         if self.data.is_empty() {
-            anyhow::bail!(Error::Unknown);
+            return Err(Error::InvalidData)
         }
 
         match self.state {
             State::Encoded => {},
-            State::Encrypted => anyhow::bail!("Data is encrypted"),
-            _ => anyhow::bail!("Unknown data")
+            State::Encrypted => return Err(Error::CannotDecodeEncrypted),
+            _ => return Err(Error::Unknown)
         };
 
         let codec = IpldCodec::try_from(self.id.codec())?;
         let hash = Code::Sha2_256.digest(&self.data);
         
         if hash.ne(self.id.hash()) {
-            anyhow::bail!("Hash is invalid")
+            return Err(Error::InvalidData)
         }
-        let data = from_ipld(codec.decode(&self.data)?)?;
+        let data = from_ipld(codec.decode(&self.data)?).map_err(anyhow::Error::from)?;
         Ok(data)
     }
 }

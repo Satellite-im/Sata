@@ -27,4 +27,38 @@ mod tests {
         
         Ok(())
     }
+
+    #[test]
+    fn encryption_mutliple_recipient() -> anyhow::Result<()> {
+
+        let plaintext = "Hello, Everybody!";
+
+        let alice_did = generate::<did_key::Ed25519KeyPair>(None);
+
+        let list = (0..50).into_iter().map(|_| generate::<did_key::Ed25519KeyPair>(None)).collect::<Vec<_>>();
+
+        let mut data = Sata::default();
+
+        for recipient in list.iter() {
+            data.add_recipient(recipient)?;
+        }
+
+        // or
+        // data.add_recipients(&list)?;
+        // though this will override the current list while the former would add to the list or error if a key exist
+
+        let encrypted_data = data.encrypt(
+            IpldCodec::DagCbor,
+            &alice_did,
+            Kind::Reference,
+            plaintext,
+        )?;
+        
+        for recipient in list {
+            let decrypted_data = encrypted_data.decrypt::<String>(&recipient)?;
+            assert_eq!(decrypted_data, plaintext)
+        }
+        
+        Ok(())
+    }
 }

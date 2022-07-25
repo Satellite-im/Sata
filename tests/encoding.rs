@@ -5,16 +5,16 @@ mod tests {
 
     #[test]
     fn encoding_test_default() -> anyhow::Result<()> {
-        let raw_data = b"Blob";
+        let raw_data: &str = "Blob";
         let data = Sata::default();
         let encoded_data = data.encode(
             IpldCodec::DagCbor,
             Kind::Reference,
-            raw_data.to_vec(),
+            raw_data,
         )?;
 
-        let decoded_data: Vec<u8> = encoded_data.decode()?;
-        assert_eq!(decoded_data, raw_data.to_vec());
+        let decoded_data: String = encoded_data.decode()?;
+        assert_eq!(decoded_data, raw_data);
         Ok(())
     }
 }
