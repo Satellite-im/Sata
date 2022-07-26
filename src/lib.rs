@@ -1,6 +1,6 @@
 pub mod ffi;
 pub mod error;
-pub mod cipher;
+mod cipher;
 
 pub use libipld;
 
@@ -52,6 +52,9 @@ pub struct Sata {
     /// [`Cid`] of the data
     id: Cid,
 
+    /// Version
+    version: u32,
+
     /// TBD
     kind: Kind,
 
@@ -75,6 +78,7 @@ impl Default for Sata {
     fn default() -> Self {
         Self {
             id: Default::default(),
+            version: Default::default(),
             kind: Default::default(),
             state: Default::default(),
             timestamp: Utc::now(),
@@ -88,6 +92,10 @@ impl Default for Sata {
 impl Sata {
     pub fn id(&self) -> Cid {
         self.id
+    }
+
+    pub fn version(&self) -> u32 {
+        self.version
     }
 
     pub fn kind(&self) -> Kind {
@@ -123,6 +131,11 @@ impl Sata {
 }
 
 impl Sata {
+
+    pub fn set_version(&mut self, version: u32) {
+        self.version = version
+    }
+
     pub fn add_recipients(&mut self, recipients: &Vec<DIDKey>) -> Result<(), Error> {
         if self.kind() != Kind::Uninitialized {
             return Err(Error::InitializedData)
