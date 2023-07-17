@@ -8,8 +8,8 @@ edition = "2021"
 [dependencies]
 thiserror = "1.0"
 chrono = { version = "0.4", features = ["serde"] }
-did-key = { git = "https://github.com/Satellite-im/did-key.rs", branch = "backport-patch" }
-libipld = { version = "0.15", features = ["serde-codec"] }
+did-key = { git = "https://github.com/Satellite-im/did-key.rs", branch = "backport-patch-v0" }
+libipld = { version = "0.16", features = ["serde-codec"] }
 rand = "0.8"
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
